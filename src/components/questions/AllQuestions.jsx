@@ -110,8 +110,10 @@ useEffect(() => {
       questionImageUrl: questionData?.questionImage || null,
       options: questionData?.options?.map((opt) => ({ text: opt.text || "", image: opt.image || null })) || Array(4).fill({ text: "", image: null }),
       correctAnswer: questionData?.correctAnswer || { text: "", image: null },
-      grade: questionData?.grade || "",
-      topic: questionData?.topic || "",
+      grade: questionData?.grade ? `G${questionData.grade}`.toUpperCase() : "",
+
+      topic: questionData?.topic ? String(questionData.topic).split(".")[0] : "",
+
       topicList: questionData?.topicList || "",
       difficultyLevel: questionData?.difficultyLevel || "",
     });
