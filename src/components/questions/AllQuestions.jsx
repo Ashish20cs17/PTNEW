@@ -19,8 +19,9 @@ const AllQuestions = () => {
   const [topic, setTopic] = useState("all");
   const [topicList, setTopicList] = useState("all");
   const [difficultyLevel, setDifficultyLevel] = useState("all");
-  const [questionType, setQuestionType] = useState("all");
+  const [questionType, setQuestionType] = useState("all")
 
+  
   useEffect(() => {
     const fetchAllQuestions = async () => {
       try {
@@ -42,6 +43,44 @@ const AllQuestions = () => {
     fetchAllQuestions();
   }, []);
 
+
+const normalizeGrade = (grade) => {
+  if (!grade) return "UNKNOWN";
+  const g = grade.toString().trim().toUpperCase();
+  if (g.match(/^G\d+$/)) return g;
+  if (g.match(/^GRADE\s*(\d)$/)) return `G${g.split(" ")[1]}`;
+  if (g.match(/^\d$/)) return `G${g}`;
+  return "UNKNOWN";
+};
+
+const normalizeDifficulty = (diff) => {
+  if (!diff) return "UNKNOWN";
+  const val = diff.toString().trim().toUpperCase();
+  if (["L1", "LEVEL 1"].includes(val)) return "L1";
+  if (["L2", "LEVEL 2"].includes(val)) return "L2";
+  if (["L3", "LEVEL 3"].includes(val)) return "L3";
+  if (["BR", "BRAIN", "BRAIN ROUND"].includes(val)) return "BR";
+  return "UNKNOWN";
+};
+
+const normalizeType = (type) => {
+  if (!type) return "UNKNOWN";
+  const val = type.toString().trim().toUpperCase();
+  if (val.includes("MCQ")) return "MCQ";
+  if (val.includes("FILL")) return "FILL_IN_THE_BLANKS";
+  if (val.includes("TRIVIA")) return "TRIVIA";
+
+  console.warn("Unknown type found:", val); // 🔍 Add this
+  return "UNKNOWN";
+};
+const normalizeTopic = (topic) => {
+  if (!topic) return "UNKNOWN";
+  return topic.toString().trim().toLowerCase();
+};
+
+
+
+
 useEffect(() => {
   if (!questions || questions.length === 0) {
     setFilteredQuestions([]);
@@ -56,37 +95,20 @@ useEffect(() => {
   const safeQuestionType = questionType && questionType !== "" ? questionType : "all";
 
 
-
-
-
-
-
-
-
-
-
-const normalizeGrade = (grade) => {
-  if (!grade) return "UNKNOWN";
-  const g = grade.toString().trim().toUpperCase();
-  if (g.match(/^G\d+$/)) return g;
-  if (g.match(/^GRADE\s*(\d)$/)) return `G${g.split(" ")[1]}`;
-  if (g.match(/^\d$/)) return `G${g}`;
-  return "UNKNOWN";
-};
-
-
-
-
-
 const filtered = questions.filter((q) => {
+  const qTopic = normalizeTopic(q.topic);
+  const filterTopic = normalizeTopic(safeTopic);
+
   return (
     (safeGrade === "all" || normalizeGrade(q.grade) === normalizeGrade(safeGrade)) &&
-    (safeTopic === "all" || q.topic === safeTopic) &&
-    (safeTopicList === "all" || q.topicList === safeTopicList) &&
-    (safeDifficulty === "all" || q.difficultyLevel === safeDifficulty) &&
-    (safeQuestionType === "all" || q.type === safeQuestionType)
+    (safeTopic === "all" || qTopic === filterTopic) &&
+    (safeTopicList === "all" || (q.topicList || "").toLowerCase() === safeTopicList.toLowerCase()) &&
+    (safeDifficulty === "all" || normalizeDifficulty(q.difficultyLevel) === normalizeDifficulty(safeDifficulty)) &&
+    (safeQuestionType === "all" || normalizeType(q.type) === normalizeType(safeQuestionType))
   );
 });
+
+
 
 
   setFilteredQuestions(filtered);
@@ -125,8 +147,6 @@ const filtered = questions.filter((q) => {
     }
   };
 
-
-//here  
 
   const isHTML = (str) => /<[^>]+>/.test(str);
 
@@ -337,19 +357,22 @@ const assignSetToUser = async (userId, setId) => {
               <option value="MCQ">MCQ</option>
               <option value="FILL_IN_THE_BLANKS">Fill in the Blanks</option>
               <option value="TRIVIA">Trivia</option>
+              <option value="UNKNOWN">UNKNOWN</option> {/* 👈 ADD THIS */}
             </select>
           </div>
           
           <div className="formGroup">
             <label htmlFor="difficultyFilter">Difficulty Level:</label>
-            <select 
-              id="difficultyFilter"
-              value={difficultyLevel} 
-              onChange={(e) => setDifficultyLevel(e.target.value)}
-            >
-              <option value="all">All Difficulty Levels</option>
-              {["L1", "L2", "L3", "Br"].map((level) => <option key={level} value={level}>{level}</option>)}
-            </select>
+           <select 
+    id="difficultyFilter"
+    value={difficultyLevel} 
+    onChange={(e) => setDifficultyLevel(e.target.value)}
+  >
+    <option value="all">All Difficulty Levels</option>
+    {["L1", "L2", "L3", "BR", "UNKNOWN"].map((level) => (
+      <option key={level} value={level}>{level}</option>
+    ))}
+  </select>
           </div>
         </div>
       </div>

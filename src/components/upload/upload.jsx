@@ -359,18 +359,19 @@ let questionData = {
             setTopicList={setTopicList}
           />
   
-          {/* Difficulty Level */}
-          <div className="formGroup">
-            <label>Difficulty Level:</label>
-            <select value={difficultyLevel} onChange={(e) => setDifficultyLevel(e.target.value)}>
-              <option value="">Select Difficulty</option>
-              <option value="L1">L1</option>
-              <option value="L2">L2</option>
-              <option value="L3">L3</option>
-              <option value="Br">Br</option>
-            </select>
-          </div>
-  
+         {/* Difficulty Level */}
+<div className="formGroup">
+  <label>Difficulty Level:</label>
+  <select value={difficultyLevel} onChange={(e) => setDifficultyLevel(e.target.value)}>
+    <option value="">Select Difficulty</option>
+    <option value="L1">L1</option>
+    <option value="L2">L2</option>
+    <option value="L3">L3</option>
+    <option value="BR">BR</option>           {/* ✅ UPPERCASE */}
+    <option value="UNKNOWN">UNKNOWN</option> {/* ✅ Correct */}
+  </select>
+</div>
+
           {/* Question ID */}
           <div className="formGroup">
             <label>Question ID:</label>
