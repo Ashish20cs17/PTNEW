@@ -36,6 +36,20 @@ const Upload = () => {
 const [bulkLoading, setBulkLoading] = useState(false);
 const [bulkError, setBulkError] = useState(null);
 const [uploadProgress, setUploadProgress] = useState(0);
+const [uploaderName, setUploaderName] = useState(localStorage.getItem("username") || "");
+
+
+useEffect(() => {
+  if (!localStorage.getItem("username")) {
+    const name = prompt("Enter your name:");
+    if (name) {
+      localStorage.setItem("username", name);
+      setUploaderName(name);
+    }
+  }
+}, []);
+
+
 
   const config = {
     readonly: false,
@@ -119,26 +133,27 @@ const handleExcelUpload = async (e) => {
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
+for (const row of jsonData) {
+const newQuestion = {
+  question: row.Question || "",
+  options: row.Options ? JSON.parse(row.Options) : [],
+  correctAnswer: { text: row.CorrectAnswer || "" },
+  grade: String(row.Grade || ""),
+  topic: row.Topic || "",
+  topicList: [],
+  difficultyLevel: row.Difficulty || "",
+  questionType: row.Type || "MCQ", // for frontend edit
+  type: row.Type || "MCQ",         // for backend/filtering
+  timestamp: Date.now(),
+  date: new Date().toISOString().split("T")[0],
+};
 
-      for (const row of jsonData) {
-        const newQuestion = {
-          question: row.Question || "",
-          options: row.Options ? JSON.parse(row.Options) : [],
-          correctAnswer: {
-            text: row.CorrectAnswer || ""
-          },
-          grade: row.Grade || "",
-          topic: row.Topic || "",
-          topicList: [],  // Update if needed
-          difficultyLevel: row.Difficulty || "",
-          questionType: row.Type || "MCQ",
-          timestamp: serverTimestamp(),
-          date: new Date().toISOString().split("T")[0],
-        };
 
-        const newRef = push(ref(database, "questions"));
-        await set(newRef, newQuestion);
-      }
+  const newRef = push(ref(database, "questions"));
+  await set(newRef, newQuestion);
+}
+
+
 
       toast.success("Questions uploaded from Excel successfully");
     };
@@ -221,56 +236,66 @@ const handleExcelUpload = async (e) => {
     updateQuestionID();
   }, [grade, topic, topicList]);
 
-  const uploadQuestion = async () => {
+const uploadQuestion = async () => {
+  console.log("uploadQuestion: Starting upload process");
+  const uploader = uploaderName || "Anonymous";
+
+
+  if (!question && !questionImageUrl) {
+    setError("Please enter a question or upload an image");
+    console.log("uploadQuestion: Validation failed - no question or image");
+    return;
+  }
+
+  if (questionType !== "TRIVIA" && (!grade || !topic || !topicList || !difficultyLevel)) {
+    setError("Please select grade, topic, subtopic, and difficulty");
+    console.log("uploadQuestion: Validation failed - missing selections");
+    return;
+  }
+
+  if (questionType !== "TRIVIA" && !questionID) {
+    setError("Question ID not generated");
+    console.log("uploadQuestion: Validation failed - no questionID");
+    return;
+  }
+
+  // ✅ Validation for uploader (optional)
+  if (!uploader) {
+    setError("Uploader information missing");
+    console.log("uploadQuestion: Validation failed - missing uploader");
+    return;
+  }
+
+  setError(null);
+  setLoading(true);
+  console.log("uploadQuestion: Validation passed, proceeding with upload");
+
+  try {
+    const questionsRef = ref(database, "questions");
+    const newQuestionRef = push(questionsRef);
+    const firebaseKey = newQuestionRef.key;
+    console.log("uploadQuestion: Generated Firebase key:", firebaseKey);
+
+    if (questionType !== "TRIVIA") {
+      console.log("uploadQuestion: Using questionID:", questionID);
+      await reserveQuestionID(questionID, firebaseKey);
+      console.log("uploadQuestion: Question ID reserved successfully");
+    }
+
+    const today = new Date().toISOString().split("T")[0];
+
     console.log("uploadQuestion: Starting upload process");
 
-    if (!question && !questionImageUrl) {
-      setError("Please enter a question or upload an image");
-      console.log("uploadQuestion: Validation failed - no question or image");
-      return;
-    }
-    
-    // Only validate these fields if not a trivia question
-    if (questionType !== "TRIVIA" && (!grade || !topic || !topicList || !difficultyLevel)) {
-      setError("Please select grade, topic, subtopic, and difficulty");
-      console.log("uploadQuestion: Validation failed - missing selections");
-      return;
-    }
-    
-    // Only validate questionID for non-trivia questions
-    if (questionType !== "TRIVIA" && !questionID) {
-      setError("Question ID not generated");
-      console.log("uploadQuestion: Validation failed - no questionID");
-      return;
-    }
 
-    setError(null);
-    setLoading(true);
-    console.log("uploadQuestion: Validation passed, proceeding with upload");
+let questionData = {
+  question,
+  questionImage: questionImageUrl || null,
+  timestamp: Date.now(),
+  type: questionType,
+  uploader, // ✅ Save uploader to Firebase
+};
 
-    try {
-      // Push the question to get a Firebase key
-      const questionsRef = ref(database, "questions");
-      const newQuestionRef = push(questionsRef);
-      const firebaseKey = newQuestionRef.key;
-      console.log("uploadQuestion: Generated Firebase key:", firebaseKey);
 
-      // Only reserve question ID if not a trivia question
-      if (questionType !== "TRIVIA") {
-        console.log("uploadQuestion: Using questionID:", questionID);
-        await reserveQuestionID(questionID, firebaseKey);
-        console.log("uploadQuestion: Question ID reserved successfully");
-      }
-
-      // Prepare question data
-      const today = new Date().toISOString().split("T")[0];
-      let questionData = {
-        question,
-        questionImage: questionImageUrl,
-        type: questionType,
-        timestamp: serverTimestamp(),
-        date: today,
-      };
 
       if (questionType !== "TRIVIA") {
         questionData = {
