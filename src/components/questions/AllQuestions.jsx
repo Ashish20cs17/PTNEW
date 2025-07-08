@@ -121,18 +121,33 @@ const normalizeGrade = (grade) => {
 
 
   const UploadComponent = ({ questionData, onSave, onCancel }) => {
-const [formData, setFormData] = useState({
+
+ const [formData, setFormData] = useState({
   questionType: questionData?.type || "MCQ",
   question: questionData?.question || "",
   questionImageUrl: questionData?.questionImage || null,
+
   options: questionData?.options?.map((opt) => ({
     text: opt.text || "",
     image: opt.image || null,
   })) || Array(4).fill({ text: "", image: null }),
+
   correctAnswer: questionData?.correctAnswer || { text: "", image: null },
-  grade: questionData?.grade ? `G${questionData.grade}`.toUpperCase() : "",
-  topic: questionData?.topic ? String(questionData.topic).split(".")[0] : "",
-  topicList: questionData?.topic ? String(questionData.topic).split(".").slice(0, 2).join(".") : "",
+
+  // ✅ Grade handling
+  grade: (() => {
+    const g = questionData?.grade;
+    if (!g) return "";
+    if (g.toString().startsWith("G")) return g.toUpperCase();
+    return `G${g}`.toUpperCase();
+  })(),
+
+  // ✅ Topic handling
+  topic: questionData?.topic || "",
+
+  // ✅ Subtopic handling — prefer questionData.topicList, else fallback
+  topicList: questionData?.topicList || "",
+
   difficultyLevel: questionData?.difficultyLevel || "",
 });
 
