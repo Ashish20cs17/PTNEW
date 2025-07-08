@@ -381,36 +381,27 @@ const MATH_DATA = {
     ]},
   },
 };
+
 const DynamicMathSelector = ({ grade, setGrade, topic, setTopic, topicList, setTopicList }) => {
-  const handleGradeChange = (e) => {
-    setGrade(e.target.value);
-    setTopic("all");
-    setTopicList("all");
-  };
+const handleGradeChange = (e) => {
+  setGrade(e.target.value);
+  setTopic("all");
+  setTopicList("all");
+};
 
-  const handleTopicChange = (e) => {
-    setTopic(e.target.value);
-    setTopicList("all");
-  };
+const handleTopicChange = (e) => {
+  setTopic(e.target.value);
+  setTopicList("all");
+};
+  const filteredTopics = MATH_DATA.topics.filter((t) => t.grade === grade);
 
-const cleanedTopics = MATH_DATA.topics
-  .filter(t => t.code && t.text) // remove incomplete entries
-  .map(t => ({
-    code: t.code.trim().toUpperCase(),
-    text: t.text.trim()
-  }));
-
-const filteredTopics = Array.from(
-  new Map(
-    cleanedTopics.map((t) => [t.text.toLowerCase(), t])
-  ).values()
-);
-
-
+  // Debugging logs
+  console.log("Grade:", grade);
+  console.log("Topic:", topic);
+  console.log("Subtopics available:", MATH_DATA.subtopics[topic]?.[grade]);
 
   return (
     <div>
-      {/* Grade Selector */}
       <div className="formGroup">
         <label>Grade:</label>
         <select value={grade} onChange={handleGradeChange}>
@@ -423,21 +414,21 @@ const filteredTopics = Array.from(
         </select>
       </div>
 
-      {/* ✅ Always show Topic Selector */}
-      <div className="formGroup">
-        <label>Topic:</label>
-        <select value={topic} onChange={handleTopicChange}>
-          <option value="all">Select Topic</option>
-          {filteredTopics.map((t) => (
-            <option key={t.code} value={t.code}>
-              {t.text}
-            </option>
-          ))}
-        </select>
-      </div>
+      {grade && (
+        <div className="formGroup">
+          <label>Topic:</label>
+          <select value={topic} onChange={handleTopicChange}>
+            <option value="all">Select Topic</option>
+            {filteredTopics.map((t) => (
+              <option key={t.code} value={t.code}>
+                {t.text}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
-      {/* Show Subtopics only if grade & topic are selected */}
-      {grade !== "all" && topic !== "all" && MATH_DATA.subtopics[topic]?.[grade] && (
+      {grade && topic && MATH_DATA.subtopics[topic]?.[grade] && (
         <div className="formGroup">
           <label>Subtopic:</label>
           <select value={topicList} onChange={(e) => setTopicList(e.target.value)}>
