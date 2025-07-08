@@ -1,21 +1,14 @@
- import React, { useEffect, useState, useRef } from "react";
-import { ref, get, remove, update, serverTimestamp, child } from "firebase/database";
+import React, { useEffect, useState, useRef } from "react";
 import { database } from "../firebase/FirebaseSetup";
+import { ref, get, remove, update, serverTimestamp } from "firebase/database";
 import supabase from "../supabase/SupabaseConfig";
 import { ToastContainer, toast } from "react-toastify";
 import parse from "html-react-parser";
 import JoditEditor from "jodit-react";
 import DynamicMathSelector from "../DynamicMathSelector";
 import "./AllQuestions.css";
+
 import "../upload/Upload.css";
-
-
-const stripHTML = (html) => {
-  if (!html) return "";
-  const div = document.createElement("div");
-  div.innerHTML = html;
-  return div.textContent || div.innerText || "";
-};
 
 const AllQuestions = () => {
   const [questions, setQuestions] = useState([]);
@@ -28,121 +21,34 @@ const AllQuestions = () => {
   const [difficultyLevel, setDifficultyLevel] = useState("all");
   const [questionType, setQuestionType] = useState("all");
 
-const [viewer, setViewer] = useState(null);
-
-
-
-
-
-const applyFilters = () => {
-  let filtered = [...questions];
-
- 
-  if (questionType !== "all") {
-    filtered = filtered.filter((q) => q.type === questionType);
-  }
-
-  if (difficultyLevel !== "all") {
-    filtered = filtered.filter((q) => q.difficultyLevel === difficultyLevel);
-  }
-
-  setFilteredQuestions(filtered);
-};
-
-useEffect(() => {
-  applyFilters();
-}, [questions, grade, topic, questionType, difficultyLevel, viewer]);
-
-useEffect(() => {
-  const storedViewer = JSON.parse(localStorage.getItem('viewer'));
-  if (!storedViewer) {
-    navigate('/view-login');
-  } else {
-    setViewer(storedViewer);
-  }
-}, []);
-
-
-
-
   useEffect(() => {
-  const fetchAllQuestions = async () => {
-    try {
-      const dbRef = ref(database);
-      const snapshot = await get(child(dbRef, "/"));
-
-      const singleQuestions = snapshot.child("questions");
-      const multiQuestions = snapshot.child("multiQuestions");
-
-      const combined = [];
-
-      // ✅ Process Single Questions
-      singleQuestions.forEach((child) => {
-        combined.push({ id: child.key, ...child.val() });
-      });
-
-      // ✅ Process Multi Questions (flatten)
-     multiQuestions.forEach((child) => {
-  const multiData = child.val();
-  const multiId = child.key;
-
-  if (Array.isArray(multiData.subQuestions)) {
-    multiData.subQuestions.forEach((subQ, index) => {
-      combined.push({
-      id: `${multiId}-${index}`,
-multiId, // Use this to fetch from DB
-
-        mainQuestion: stripHTML(multiData.mainQuestion || ""),
-        fromMulti: true,
-        subIndex: index,
-        question: stripHTML(subQ.question || ""),
-        options: subQ.options,
-        correctAnswer: subQ.correctAnswer,
-        type: subQ.type,
-        grade: multiData.grade,
-        topic: multiData.topic,
-        topicList: multiData.topicList,
-        difficultyLevel: multiData.difficultyLevel,
-        timestamp: multiData.createdAt,
-      });
-    });
-  }
-});
-
-      
-  // ✅ Sort by timestamp - newest questions first
-combined.sort((a, b) => b.timestamp - a.timestamp);
-
-// 🔁 Sort by timestamp (latest first)
-combined.forEach((q) => {
-  q.timestamp = Number(q.timestamp) || 0;
-});
-combined.sort((a, b) => b.timestamp - a.timestamp);
-
-setQuestions(combined);
-setFilteredQuestions(combined);
-
-      console.log("🧪 Combined allQuestions:", combined);
-    } catch (err) {
-      console.error("❌ Failed to fetch questions:", err);
-      setError("Failed to load questions.");
-    }
-  };
-
-  fetchAllQuestions();
-}, []);
-
+    const fetchAllQuestions = async () => {
+      try {
+        const questionsRef = ref(database, "questions");
+        const snapshot = await get(questionsRef);
+        if (!snapshot.exists()) {
+          setError("No questions found!");
+          return;
+        }
+        const data = snapshot.val();
+        const allFetchedQuestions = Object.entries(data).map(([id, question]) => ({ id, ...question })).reverse();
+        setQuestions(allFetchedQuestions);
+        setFilteredQuestions(allFetchedQuestions);
+      } catch (err) {
+        console.error("Error fetching questions:", err);
+        setError("Failed to fetch questions");
+      }
+    };
+    fetchAllQuestions();
+  }, []);
 
 useEffect(() => {
-
-
-
-
-  if (!questions || questions.length === 0 || !viewer) {
+  if (!questions || questions.length === 0) {
     setFilteredQuestions([]);
     return;
   }
 
+  // Normalize filter values so empty strings or null are treated as "all"
   const safeGrade = grade && grade !== "" ? grade : "all";
   const safeTopic = topic && topic !== "" ? topic : "all";
   const safeTopicList = topicList && topicList !== "" ? topicList : "all";
@@ -150,11 +56,7 @@ useEffect(() => {
   const safeQuestionType = questionType && questionType !== "" ? questionType : "all";
 
   const filtered = questions.filter((q) => {
-    const matchesViewerGrade =
-      viewer?.grade === "admin" ? true : q.grade === viewer?.grade;
-
     return (
-      matchesViewerGrade &&
       (safeGrade === "all" || q.grade === safeGrade) &&
       (safeTopic === "all" || q.topic === safeTopic) &&
       (safeTopicList === "all" || q.topicList === safeTopicList) &&
@@ -164,45 +66,19 @@ useEffect(() => {
   });
 
   setFilteredQuestions(filtered);
-}, [questions, grade, topic, topicList, difficultyLevel, questionType, viewer]);
+}, [questions, grade, topic, topicList, difficultyLevel, questionType]);
 
-const handleEdit = (question) => {
-  if (question.fromMulti) {
-    // Parse metadata
-    const { multiId, mainIndex, subIndex } = question;
-    // Pass all info to editor
-    setEditingQuestion(question);
-  } else {
-    setEditingQuestion(question);
-  }
-};
 
-const handleDelete = async (question) => {
-  const { id, questionImage, options, correctAnswer } = question;
+  const handleEdit = (question) => setEditingQuestion(question);
 
-  if (question.fromMulti) {
-    const { multiId, mainIndex, subIndex } = question;
-  const multiRef = ref(database, `multiQuestions/${multiId}/subQuestions/${subIndex}`);
-
-    
+  const handleDelete = async (question) => {
+    const { id, questionImage, options, correctAnswer } = question;
     await Promise.all([
       deleteImageFromSupabase(questionImage),
       ...(options?.map((opt) => deleteImageFromSupabase(opt.image)) || []),
       deleteImageFromSupabase(correctAnswer?.image),
     ]);
 
-    try {
-      await remove(multiRef);
-      setQuestions((prev) => prev.filter((q) => q.id !== id));
-      setFilteredQuestions((prev) => prev.filter((q) => q.id !== id));
-      toast.success("Nested question deleted successfully");
-    } catch (err) {
-      console.error("Error deleting nested question:", err);
-      setError("Failed to delete nested question");
-    }
-
-  } else {
-    // Normal question deletion (already implemented)
     try {
       await remove(ref(database, `questions/${id}`));
       setQuestions((prev) => prev.filter((q) => q.id !== id));
@@ -212,9 +88,7 @@ const handleDelete = async (question) => {
       console.error("Error deleting question:", err);
       setError("Failed to delete question");
     }
-  }
-};
-
+  };
 
   const deleteImageFromSupabase = async (url) => {
     if (!url) return;
@@ -230,24 +104,17 @@ const handleDelete = async (question) => {
   const isHTML = (str) => /<[^>]+>/.test(str);
 
   const UploadComponent = ({ questionData, onSave, onCancel }) => {
-const [formData, setFormData] = useState({
-  questionType: questionData?.questionType || questionData?.type || "MCQ",
-  question: questionData?.question || "",
-  questionImageUrl: questionData?.questionImage || null,
-  options: questionData?.options?.map((opt) => ({
-    text: opt.text || "",
-    image: opt.image || null,
-  })) || Array(4).fill({ text: "", image: null }),
-  correctAnswer: questionData?.correctAnswer || { text: "", image: null },
-  grade: questionData?.grade ? `G${questionData.grade}`.toUpperCase() : "",
-
-topic: questionData?.topic ? String(questionData.topic).split(".")[0] : "",
-
-  topicList: questionData?.topicList || "",
-  difficultyLevel: questionData?.difficultyLevel ? String(questionData.difficultyLevel) : "",  // ✅ fix here
-});
-
-
+    const [formData, setFormData] = useState({
+      questionType: questionData?.type || "MCQ",
+      question: questionData?.question || "",
+      questionImageUrl: questionData?.questionImage || null,
+      options: questionData?.options?.map((opt) => ({ text: opt.text || "", image: opt.image || null })) || Array(4).fill({ text: "", image: null }),
+      correctAnswer: questionData?.correctAnswer || { text: "", image: null },
+      grade: questionData?.grade || "",
+      topic: questionData?.topic || "",
+      topicList: questionData?.topicList || "",
+      difficultyLevel: questionData?.difficultyLevel || "",
+    });
     const [loading, setLoading] = useState(false);
     const editor = useRef(null);
 
@@ -298,14 +165,7 @@ topic: questionData?.topic ? String(questionData.topic).split(".")[0] : "",
       }
       setLoading(true);
       try {
-        let questionRef;
-if (questionData.fromMulti) {
-  const { multiId, mainIndex, subIndex } = questionData;
-  questionRef = ref(database, `multiQuestions/${multiId}/questions/${mainIndex}/subQuestions/${subIndex}`);
-} else {
-  questionRef = ref(database, `questions/${questionData.id}`);
-}
-
+        const questionRef = ref(database, `questions/${questionData.id}`);
         const updatedData = {
           ...formData,
           timestamp: serverTimestamp(),
@@ -352,6 +212,13 @@ const assignSetToUser = async (userId, setId) => {
         alert("Failed to assign set.");
     }
 };
+
+
+
+
+
+
+
 
     return (
       <div className="uploadContainer editMode">
@@ -420,169 +287,73 @@ const assignSetToUser = async (userId, setId) => {
   };
 
   return (
-  <div className="allQuestionContainer">
-    <h2>All Questions</h2>
-    <hr />
-    <div className="filterControls">
-      <div className="horizontal-filters">
-        <DynamicMathSelector
-          grade={grade}
-          setGrade={setGrade}
-          topic={topic}
-          setTopic={setTopic}
-          topicList={topicList}
-          setTopicList={setTopicList}
-        />
-
-        <div className="formGroup">
-          <label htmlFor="questionTypeFilter">Question Type:</label>
-          <select
-            id="questionTypeFilter"
-            value={questionType}
-            onChange={(e) => setQuestionType(e.target.value)}
-          >
-            <option value="all">All Types</option>
-            <option value="MCQ">MCQ</option>
-            <option value="FILL_IN_THE_BLANKS">Fill in the Blanks</option>
-            <option value="TRIVIA">Trivia</option>
-          </select>
-        </div>
-
-        <div className="formGroup">
-          <label htmlFor="difficultyFilter">Difficulty Level:</label>
-          <select
-            id="difficultyFilter"
-            value={difficultyLevel}
-            onChange={(e) => setDifficultyLevel(e.target.value)}
-          >
-            <option value="all">All Difficulty Levels</option>
-            {["L1", "L2", "L3", "Br"].map((level) => (
-              <option key={level} value={level}>
-                {level}
-              </option>
-            ))}
-          </select>
+    <div className="allQuestionContainer">
+      <h2>All Questions</h2>
+      <hr />
+      <div className="filterControls">
+        {/* Using the horizontal-filters class to override DynamicMathSelector vertical styles */}
+        <div className="horizontal-filters">
+          <DynamicMathSelector grade={grade} setGrade={setGrade} topic={topic} setTopic={setTopic} topicList={topicList} setTopicList={setTopicList} />
+          
+          <div className="formGroup">
+            <label htmlFor="questionTypeFilter">Question Type:</label>
+            <select 
+              id="questionTypeFilter"
+              value={questionType} 
+              onChange={(e) => setQuestionType(e.target.value)}
+            >
+              <option value="all">All Types</option>
+              <option value="MCQ">MCQ</option>
+              <option value="FILL_IN_THE_BLANKS">Fill in the Blanks</option>
+              <option value="TRIVIA">Trivia</option>
+            </select>
+          </div>
+          
+          <div className="formGroup">
+            <label htmlFor="difficultyFilter">Difficulty Level:</label>
+            <select 
+              id="difficultyFilter"
+              value={difficultyLevel} 
+              onChange={(e) => setDifficultyLevel(e.target.value)}
+            >
+              <option value="all">All Difficulty Levels</option>
+              {["L1", "L2", "L3", "Br"].map((level) => <option key={level} value={level}>{level}</option>)}
+            </select>
+          </div>
         </div>
       </div>
+
+      {editingQuestion && <UploadComponent questionData={editingQuestion} onSave={() => setEditingQuestion(null)} onCancel={() => setEditingQuestion(null)} />}
+      {error && <p style={{ color: "red" }}>{error}</p>}
+      {filteredQuestions.length === 0 && !error && <p>No questions found!</p>}
+      <p>Showing {filteredQuestions.length} of {questions.length} questions</p>
+
+      <div className="questionList">
+        <ol>
+          {filteredQuestions.map((q) => (
+            <li key={q.id} className="questionItem">
+              <strong>{isHTML(q.question) ? parse(q.question) : q.question}</strong> ({q.type})
+              <small> - {q.timestamp ? new Date(q.timestamp).toLocaleString() : "No Time"}</small>
+              <div>{q.questionImage && (<img src={q.questionImage} alt="Question" style={{ maxWidth: "300px" }} />)}</div>
+              {q.type === "MCQ" && Array.isArray(q.options) && (
+                <ul>
+                  {q.options.map((opt, idx) => (
+                    <li key={idx}>{opt.text} {opt.image && (<img src={opt.image} alt={`Option ${idx + 1}`} style={{ maxWidth: "100px" }} />)}</li>
+                  ))}
+                </ul>
+              )}
+              {q.correctAnswer && (
+                <p><strong>Correct Answer:</strong> {q.correctAnswer.text} {q.correctAnswer.image && (<img src={q.correctAnswer.image} alt="Answer" style={{ maxWidth: "100px" }} />)}</p>
+              )}
+              
+              <button className="editButton" onClick={() => handleEdit(q)}>Edit</button>
+              <button className="deleteButton" onClick={() => handleDelete(q)}>Delete</button>
+            </li>
+          ))}
+        </ol>
+      </div>
     </div>
-
-    {editingQuestion && (
-      <UploadComponent
-        questionData={editingQuestion}
-        onSave={() => setEditingQuestion(null)}
-        onCancel={() => setEditingQuestion(null)}
-      />
-    )}
-    {error && <p style={{ color: "red" }}>{error}</p>}
-    {filteredQuestions.length === 0 && !error && <p>No questions found!</p>}
-    <p>Showing {filteredQuestions.length} of {questions.length} questions</p>
-
- <div className="questionList">
-  <ol>
-    {filteredQuestions.map((q) => (
-      <li key={q.id} className="questionItem">
-
-        {/* Multi Info if present */}
-        {q.fromMulti && (
-          <p style={{ color: "orange", fontWeight: "bold" }}>
-            🧩 Multi-question (Sub #{q.subIndex + 1}) — Multi ID: <strong>{q.multiId}</strong>
-          </p>
-        )}
-
-        {/* Main question if available */}
-        {q.mainQuestion && (
-          <p style={{ fontWeight: "bold", color: "purple" }}>
-            Main: {q.mainQuestion}
-          </p>
-        )}
-
-        {/* Render question text or fallback */}
-        <p style={{ marginBottom: "6px" }}>
-          <strong>
-
-
-
-          {q.uploader && (
-  <p style={{ fontStyle: "italic", color: "#007bff", textAlign: "right" }}>
-    Uploaded by: <strong>{q.uploader}</strong>
-  </p>
-)}
-
-            {(() => {
-              if (q.question && isHTML(q.question)) return parse(q.question);
-              if (q.question) return q.question;
-              if (q.mainQuestion) return `Main: ${q.mainQuestion}`;
-              return "❓ No Question Text";
-            })()}
-          </strong> ({q.type})
-        </p>
-
-        {/* Timestamp */}
-        <small>
-          - {q.timestamp ? new Date(q.timestamp).toLocaleString() : "No Time"}
-        </small>
-
-        {/* Image if available */}
-        {q.questionImage && (
-          <div>
-            <img
-              src={q.questionImage}
-              alt="Question"
-              style={{ maxWidth: "300px" }}
-            />
-          </div>
-        )}
-
-        {/* Options for MCQ */}
-        {q.type === "MCQ" && Array.isArray(q.options) && (
-          <ul>
-            {q.options.map((opt, idx) => (
-              <li key={idx}>
-                {typeof opt === "string" ? opt : opt?.text}
-                {opt?.image && (
-                  <img
-                    src={opt.image}
-                    alt={`Option ${idx + 1}`}
-                    style={{ maxWidth: "100px", marginLeft: "8px" }}
-                  />
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {/* Correct Answer */}
-        {q.correctAnswer && (
-          <p>
-            <strong>Correct Answer:</strong>{" "}
-            {typeof q.correctAnswer === "string"
-              ? q.correctAnswer
-              : q.correctAnswer?.text}
-            {q.correctAnswer?.image && (
-              <img
-                src={q.correctAnswer.image}
-                alt="Answer"
-                style={{ maxWidth: "100px", marginLeft: "8px" }}
-              />
-            )}
-          </p>
-        )}
-
-  
-        {/* Action Buttons */}
-        <button className="editButton" onClick={() => handleEdit(q)}>
-          Edit
-        </button>
-        <button className="deleteButton" onClick={() => handleDelete(q)}>
-          Delete
-        </button>
-      </li>
-    ))}
-  </ol>
-</div>
-
-  </div>
-)
+  );
 };
 
 export default AllQuestions;
