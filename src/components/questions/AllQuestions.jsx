@@ -55,15 +55,39 @@ useEffect(() => {
   const safeDifficulty = difficultyLevel && difficultyLevel !== "" ? difficultyLevel : "all";
   const safeQuestionType = questionType && questionType !== "" ? questionType : "all";
 
-  const filtered = questions.filter((q) => {
-    return (
-      (safeGrade === "all" || q.grade === safeGrade) &&
-      (safeTopic === "all" || q.topic === safeTopic) &&
-      (safeTopicList === "all" || q.topicList === safeTopicList) &&
-      (safeDifficulty === "all" || q.difficultyLevel === safeDifficulty) &&
-      (safeQuestionType === "all" || q.type === safeQuestionType)
-    );
-  });
+
+
+
+
+
+
+
+
+
+
+const normalizeGrade = (grade) => {
+  if (!grade) return "UNKNOWN";
+  const g = grade.toString().trim().toUpperCase();
+  if (g.match(/^G\d+$/)) return g;
+  if (g.match(/^GRADE\s*(\d)$/)) return `G${g.split(" ")[1]}`;
+  if (g.match(/^\d$/)) return `G${g}`;
+  return "UNKNOWN";
+};
+
+
+
+
+
+const filtered = questions.filter((q) => {
+  return (
+    (safeGrade === "all" || normalizeGrade(q.grade) === normalizeGrade(safeGrade)) &&
+    (safeTopic === "all" || q.topic === safeTopic) &&
+    (safeTopicList === "all" || q.topicList === safeTopicList) &&
+    (safeDifficulty === "all" || q.difficultyLevel === safeDifficulty) &&
+    (safeQuestionType === "all" || q.type === safeQuestionType)
+  );
+});
+
 
   setFilteredQuestions(filtered);
 }, [questions, grade, topic, topicList, difficultyLevel, questionType]);
@@ -102,24 +126,26 @@ useEffect(() => {
   };
 
 
-//here  save
+//here  
 
   const isHTML = (str) => /<[^>]+>/.test(str);
 
   const UploadComponent = ({ questionData, onSave, onCancel }) => {
-    const [formData, setFormData] = useState({
-      questionType: questionData?.type || "MCQ",
-      question: questionData?.question || "",
-      questionImageUrl: questionData?.questionImage || null,
-      options: questionData?.options?.map((opt) => ({ text: opt.text || "", image: opt.image || null })) || Array(4).fill({ text: "", image: null }),
-      correctAnswer: questionData?.correctAnswer || { text: "", image: null },
-      grade: questionData?.grade ? `G${questionData.grade}`.toUpperCase() : "",
+  const [formData, setFormData] = useState({
+  questionType: questionData?.type || "MCQ",
+  question: questionData?.question || "",
+  questionImageUrl: questionData?.questionImage || null,
+  options: questionData?.options?.map((opt) => ({
+    text: opt.text || "",
+    image: opt.image || null,
+  })) || Array(4).fill({ text: "", image: null }),
+  correctAnswer: questionData?.correctAnswer || { text: "", image: null },
+  grade: questionData?.grade ? `G${questionData.grade}`.toUpperCase() : "",
+  topic: questionData?.topic ? String(questionData.topic).split(".")[0] : "",
+  topicList: questionData?.topic ? String(questionData.topic).split(".").slice(0, 2).join(".") : "",
+  difficultyLevel: questionData?.difficultyLevel || "",
+});
 
-      topic: questionData?.topic ? String(questionData.topic).split(".")[0] : "",
-
-      topicList: questionData?.topicList || "",
-      difficultyLevel: questionData?.difficultyLevel || "",
-    });
     const [loading, setLoading] = useState(false);
     const editor = useRef(null);
 
